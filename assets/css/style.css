@@ -741,13 +741,64 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--rose-light); border-radius: 3px; }
 
+/* ===== HAMBURGER BUTTON ===== */
+.hamburger-btn {
+  display: none;
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 300;
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  border: none;
+  background: var(--rose);
+  color: white;
+  font-size: 1.3rem;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(180,50,90,0.35);
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+.hamburger-btn:active { background: var(--rose-dark); }
+
+/* Overlay behind sidebar on mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 150;
+}
+.sidebar-overlay.active { display: block; }
+
 /* ===== MOBILE ===== */
 @media (max-width: 768px) {
-  .sidebar { width: 100%; height: auto; position: relative; }
+  .hamburger-btn { display: flex; }
+
+  .sidebar {
+    position: fixed;
+    right: -260px;
+    top: 0; bottom: 0;
+    width: 260px;
+    z-index: 200;
+    transition: right 0.3s cubic-bezier(.4,0,.2,1);
+    height: 100%;
+  }
+  .sidebar.open { right: 0; }
+
   .main { margin-right: 0; }
+
+  .topbar { padding: 14px 16px 14px 64px; }
+
+  .section { padding: 20px 16px 32px; }
+
   .forbidden-grid { grid-template-columns: 1fr; }
   .two-cols, .three-cols { grid-template-columns: 1fr; }
   .fab-eg-row { grid-template-columns: 1fr; }
+  .store-cards-grid { grid-template-columns: 1fr !important; }
+  .cards-grid { grid-template-columns: 1fr; }
+  .rec-cards-grid { grid-template-columns: 1fr; }
 }
 
 .note-tag-btn {
@@ -1062,3 +1113,50 @@ body {
 }
 .rec-copy-btn:hover { background: #1e8449; transform: scale(1.04); }
 .rec-copy-btn.copied { background: #4a90d9; }
+
+/* ===== UTILITY CLASSES (Phase 3 — replaces inline styles in JS) ===== */
+
+/* Cards & containers */
+.js-card           { background:white; border-radius:var(--radius); padding:24px 28px; box-shadow:var(--shadow); }
+.js-card-rose      { background:white; border-radius:var(--radius); padding:24px 28px; box-shadow:var(--shadow); border-right:4px solid var(--rose); }
+.js-card-gold      { background:white; border-radius:var(--radius); padding:24px 28px; box-shadow:var(--shadow); border-right:4px solid var(--gold); }
+.js-card-sm        { background:white; border-radius:var(--radius); padding:16px 20px; box-shadow:var(--shadow); margin-bottom:20px; }
+.js-card-sm-rose   { background:white; border-radius:var(--radius); padding:16px 20px; box-shadow:var(--shadow); margin-bottom:20px; border-right:4px solid var(--rose); }
+.js-card-sm-gold   { background:white; border-radius:var(--radius); padding:16px 20px; box-shadow:var(--shadow); margin-bottom:20px; border-right:4px solid var(--gold); }
+
+/* Centered max-width wrappers */
+.js-wrap-700       { max-width:700px; margin:0 auto; }
+.js-wrap-800       { max-width:800px; margin:0 auto; }
+
+/* Row item (product row inside card) */
+.js-row-item       { background:var(--bg); border-radius:8px; padding:8px 12px; display:flex; justify-content:space-between; align-items:center; gap:8px; border:1px solid var(--border); }
+
+/* Typography helpers */
+.js-label          { font-size:0.88rem; font-weight:800; color:var(--dark); margin-bottom:10px; }
+.js-label-lg       { font-size:1rem; font-weight:800; color:var(--dark); margin-bottom:16px; }
+.js-label-sm       { font-size:0.82rem; font-weight:700; color:var(--text-muted); margin-bottom:10px; }
+.js-label-xs       { font-size:0.78rem; font-weight:700; color:var(--text-muted); margin-bottom:6px; }
+.js-desc           { font-size:0.78rem; color:var(--text-muted); line-height:1.5; margin:6px 0 8px; }
+.js-desc-xs        { font-size:0.72rem; color:var(--text-muted); margin:4px 0 8px; }
+.js-price          { font-size:0.8rem; font-weight:800; color:var(--rose-dark); white-space:nowrap; }
+.js-title-sm       { font-size:0.95rem; font-weight:800; color:var(--dark); margin-bottom:16px; }
+.js-title-xs       { font-size:0.76rem; font-weight:600; color:var(--dark); line-height:1.3; }
+
+/* Note variants */
+.js-note-gold      { background:#fdf3dd; border-right:3px solid var(--gold); border-radius:10px; padding:8px 14px; margin-bottom:16px; font-size:0.78rem; color:#8a6000; }
+
+/* Flex helpers */
+.js-flex-wrap      { display:flex; gap:8px; flex-wrap:wrap; }
+.js-grid-2         { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.js-grid-auto-130  { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); }
+.js-grid-auto-200  { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:8px; max-height:300px; overflow-y:auto; }
+
+/* Rec card selected state */
+.js-selected       { background:rgba(255,255,255,0.15); border-color:rgba(255,255,255,0.5); }
+
+/* Spacing */
+.js-mt-14          { margin-top:14px; }
+.js-mt-16          { margin-top:16px; }
+.js-mt-20          { margin-top:20px; }
+.js-pt-14          { padding-top:14px; }
+.js-selectable     { user-select:text; cursor:text; }
