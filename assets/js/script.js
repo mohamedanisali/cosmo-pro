@@ -35,6 +35,39 @@ function checkPassword() {
     }, 2000);
   }
 }
+// ===== HAMBURGER MENU (MOBILE) =====
+function toggleSidebar() {
+  var sidebar = document.getElementById('mainSidebar');
+  var overlay = document.getElementById('sidebarOverlay');
+  var btn     = document.getElementById('hamburgerBtn');
+  var isOpen  = sidebar.classList.contains('open');
+  if (isOpen) {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('active');
+    btn.textContent = '☰';
+  } else {
+    sidebar.classList.add('open');
+    overlay.classList.add('active');
+    btn.textContent = '✕';
+  }
+}
+function closeSidebar() {
+  var sidebar = document.getElementById('mainSidebar');
+  var overlay = document.getElementById('sidebarOverlay');
+  var btn     = document.getElementById('hamburgerBtn');
+  sidebar.classList.remove('open');
+  overlay.classList.remove('active');
+  btn.textContent = '☰';
+}
+// Close sidebar automatically after nav item click on mobile
+(function() {
+  var orig = window.showSection;
+  window.showSection = function(id) {
+    if (window.innerWidth <= 768) closeSidebar();
+    if (orig) orig.call(this, id);
+  };
+})();
+
 window.addEventListener('DOMContentLoaded', function() {
   setTimeout(function() {
     var toast = document.getElementById('salah-toast');
@@ -240,9 +273,9 @@ function showDiagResult() {
     <h3>${skinType}</h3>
     <h4>📋 الخصائص:</h4>
     <ul>${characteristics.map(c=>'<li>'+c+'</li>').join('')}</ul>
-    <h4 style="margin-top:14px">🌿 الروتين اليومي الموصى به:</h4>
+    <h4 class="js-mt-14">🌿 الروتين اليومي الموصى به:</h4>
     <div class="routine-steps">${routineHTML}</div>
-    <h4 style="margin-top:14px">⚠️ نصائح مهمة:</h4>
+    <h4 class="js-mt-14">⚠️ نصائح مهمة:</h4>
     <ul>${tips.map(t=>'<li>'+t+'</li>').join('')}</ul>
   `;
 }
@@ -1068,23 +1101,6 @@ function renderAcne() {
   ]);
 }
 
-function renderEye() {
-  const eyeData = window.eyeProducts || [];
-  if (!eyeData.length) {
-    document.getElementById('sec-eye-all').innerHTML = '<div class="info-note">جاري التحميل...</div>';
-    return;
-  }
-  const grid = `<div class="store-cards-grid">${eyeData.map(p => `
-    <div class="store-card">
-      <div class="store-card-name">${p.name}</div>
-      <div class="store-card-code">كود المنتج: <span>${p.code}</span></div>
-      ${p.desc ? `<div class="store-card-desc">${p.desc}</div>` : ''}
-      <div class="store-card-price">${typeof p.price === 'number' ? p.price.toLocaleString('ar-EG') : p.price} جنيه</div>
-    </div>`).join('')}</div>`;
-  document.getElementById('sec-eye-all').innerHTML =
-    `<div class="prod-section-title">👁️ جميع منتجات محيط العين (${eyeData.length} منتج)</div>` + grid;
-}
-
 function renderWhitening() {
   document.getElementById('sec-white-face').innerHTML = makeSection('🌸 تفتيح الوجه', products.whitening.face);
   document.getElementById('sec-white-spots').innerHTML = makeSection('⚫ تفتيح البقع الداكنة', products.whitening.spots);
@@ -1514,113 +1530,58 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// showSection override — safe lazy init
+// ===== SECTION REGISTRY =====
+// لإضافة قسم جديد: أضف سطر واحد هنا بس
+// { id: 'section_id', init: initFnName }  ← للأقسام اللي محتاجة init
+// { id: 'section_id', render: renderFnName } ← للأقسام اللي محتاجة render
+// { id: 'section_id', delay: 80 }         ← تغيير الـ delay لو محتاج (default: 50ms)
+const sectionRegistry = [
+  { id: 'routines',      custom: function() {
+      var rc = document.getElementById('routine-content');
+      if (rc && !rc.innerHTML.trim()) {
+        var btn = document.querySelector('#routineSelector .skin-btn');
+        if (btn) btn.dispatchEvent(new MouseEvent('click', {bubbles:true}));
+      }
+  }},
+  { id: 'recommender',   custom: function() {
+      var sec = document.getElementById('recommender');
+      if (sec && !sec.querySelector('.rec-wizard') && typeof initRecommender === 'function') initRecommender();
+  }},
+  { id: 'toner_rec',     init: 'initTonerRec' },
+  { id: 'moist_rec',     init: 'initMoistRec' },
+  { id: 'prod_masks',    render: 'renderMasks' },
+  { id: 'masks_rec',     init: 'initMasksRec' },
+  { id: 'prod_scrubs',   render: 'renderScrubs' },
+  { id: 'scrubs_rec',    init: 'initScrubsRec' },
+  { id: 'eye_rec',       init: 'initEyeRec' },
+  { id: 'acne_rec',      init: 'initAcneRec' },
+  { id: 'whitening_rec', init: 'initWhiteningRec' },
+  { id: 'antiaging_rec', init: 'initAntiAgingRec' },
+  { id: 'prod_eye',      render: 'renderEye' },
+  { id: 'prod_wrinkles', render: 'renderAntiAging' },
+  { id: 'prod_dyes',     init: 'initDyesSection', delay: 80 },
+  { id: 'dyes_rec',      init: 'initDyesRec',     delay: 80 },
+  { id: 'comparison',    init: 'initComparison' },
+  { id: 'training',      init: 'showTrainingMenu' },
+  // team_notes: no init needed — locked by password
+];
+
+// showSection override — registry driven
 window._baseShowSection = showSection;
 showSection = function(id) {
-  // If section not yet in DOM (dynamic sections created in DOMContentLoaded), retry after a tick
   if (!document.getElementById(id)) {
     setTimeout(function() { window._baseShowSection(id); }, 80);
   } else {
     window._baseShowSection(id);
   }
-  if (id === 'routines') {
-    setTimeout(function() {
-      const rc = document.getElementById('routine-content');
-      if (rc && !rc.innerHTML.trim()) {
-        const btn = document.querySelector('#routineSelector .skin-btn');
-        if (btn) btn.dispatchEvent(new MouseEvent('click', {bubbles:true}));
-      }
-    }, 50);
-  }
-  if (id === 'recommender') {
-    setTimeout(function() {
-      const sec = document.getElementById('recommender');
-      if (sec && !sec.querySelector('.rec-wizard') && typeof initRecommender === 'function') {
-        initRecommender();
-      }
-    }, 50);
-  }
-  if (id === 'toner_rec') {
-    setTimeout(function() {
-      const sec = document.getElementById('toner_rec');
-      if (sec) { initTonerRec(); }
-    }, 50);
-  }
-  if (id === 'moist_rec') {
-    setTimeout(function() {
-      const sec = document.getElementById('moist_rec');
-      if (sec) { initMoistRec(); }
-    }, 50);
-  }
-  if (id === 'prod_masks') {
-    setTimeout(function() {
-      const sec = document.getElementById('prod_masks');
-      if (sec) { renderMasks(); }
-    }, 50);
-  }
-  if (id === 'masks_rec') {
-    setTimeout(function() {
-      const sec = document.getElementById('masks_rec');
-      if (sec) { initMasksRec(); }
-    }, 50);
-  }
-  if (id === 'prod_scrubs') {
-    setTimeout(function() {
-      const sec = document.getElementById('prod_scrubs');
-      if (sec) { renderScrubs(); }
-    }, 50);
-  }
-  if (id === 'scrubs_rec') {
-    setTimeout(function() {
-      const sec = document.getElementById('scrubs_rec');
-      if (sec) { initScrubsRec(); }
-    }, 50);
-  }
-  if (id === 'eye_rec') {
-    setTimeout(function() {
-      const sec = document.getElementById('eye_rec');
-      if (sec) { initEyeRec(); }
-    }, 50);
-  }
-  if (id === 'acne_rec') {
-    setTimeout(function() {
-      const sec = document.getElementById('acne_rec');
-      if (sec) { initAcneRec(); }
-    }, 50);
-  }
-  if (id === 'whitening_rec') {
-    setTimeout(function() {
-      var sec = document.getElementById('whitening_rec');
-      if (sec) { initWhiteningRec(); }
-    }, 50);
-  }
-  if (id === 'antiaging_rec') {
-    setTimeout(function() {
-      const sec = document.getElementById('antiaging_rec');
-      if (sec) { initAntiAgingRec(); }
-    }, 50);
-  }
-  if (id === 'prod_eye') {
-    setTimeout(function() { renderEye(); }, 50);
-  }
-  if (id === 'prod_wrinkles') {
-    setTimeout(function() { renderAntiAging(); }, 50);
-  }
-  if (id === 'prod_dyes') {
-    setTimeout(function() { if (typeof initDyesSection === 'function') initDyesSection(); }, 80);
-  }
-  if (id === 'dyes_rec') {
-    setTimeout(function() { if (typeof initDyesRec === 'function') initDyesRec(); }, 80);
-  }
-  if (id === 'comparison') {
-    setTimeout(function() { if (typeof initComparison === 'function') initComparison(); }, 50);
-  }
-  if (id === 'team_notes') {
-    // notes locked by default - user must enter password
-  }
-  if (id === 'training') {
-    setTimeout(function() { if (typeof showTrainingMenu === 'function') showTrainingMenu(); }, 50);
-  }
+  var entry = sectionRegistry.find(function(r) { return r.id === id; });
+  if (!entry) return;
+  var delay = entry.delay || 50;
+  setTimeout(function() {
+    if (entry.custom) { entry.custom(); return; }
+    var fn = entry.init || entry.render;
+    if (fn && typeof window[fn] === 'function') window[fn]();
+  }, delay);
 };
 
 // ===== TONER RECOMMENDER =====
@@ -1636,7 +1597,7 @@ function initTonerRec() {
       <p>اضغط زر واحد وهيجيلك ٣ ترشيحات من ${(window.products||{toners:[]}).toners.length} تونر متاح</p>
       <div class="section-divider"></div>
     </div>
-    <div class="rec-wizard" style="max-width:700px;margin:0 auto">
+    <div class="rec-wizard" class="js-wrap-700">
       <div style="background:white;border-radius:var(--radius);padding:28px;box-shadow:var(--shadow);text-align:center;border-right:4px solid var(--rose)">
         <div style="font-size:3rem;margin-bottom:14px">💦</div>
         <div style="font-size:1.1rem;font-weight:800;color:var(--dark);margin-bottom:8px">مرشح التونر الذكي</div>
@@ -1649,7 +1610,7 @@ function initTonerRec() {
           🎯 رشّحلي تونر
         </button>
       </div>
-      <div id="toner-results" style="margin-top:20px"></div>
+      <div id="toner-results" class="js-mt-20"></div>
     </div>
   `;
 }
@@ -1687,11 +1648,11 @@ function showTonerResults() {
 
   const cardsHTML = picks.map(p =>
     '<div class="rec-card" style="border-top:4px solid ' + p.color + '">' +
-      '<div class="rec-card-body" style="padding-top:14px">' +
-        '<div class="rec-card-name" style="user-select:text;cursor:text">' + p.card.name + '</div>' +
-        (p.card.desc ? '<div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;margin:6px 0 8px">' + p.card.desc + '</div>' : '') +
+      '<div class="rec-card-body" class="js-pt-14">' +
+        '<div class="rec-card-name" class="js-selectable">' + p.card.name + '</div>' +
+        (p.card.desc ? '<div class="js-desc">' + p.card.desc + '</div>' : '') +
         '<div class="rec-card-price" style="color:' + p.color + ';font-size:1rem">' + p.card.price.toLocaleString('ar-EG') + ' جنيه</div>' +
-        '<div style="font-size:0.72rem;color:var(--text-muted);margin:4px 0 8px">كود: <strong style="color:var(--dark)">' + p.card.code + '</strong></div>' +
+        '<div class="js-desc-xs">كود: <strong style="color:var(--dark)">' + p.card.code + '</strong></div>' +
         '<button class="rec-card-shop" style="background:' + p.color + ';border:none;cursor:pointer;width:100%;font-family:Cairo,sans-serif;font-size:0.88rem;font-weight:700;color:white;padding:10px;border-radius:8px"' +
           ' onclick="tonerCopyCode(this,\'' + p.card.code + '\')">' +
           '📋 نسخ الكود' +
@@ -1707,27 +1668,27 @@ function showTonerResults() {
           '<h3>✅ ترشيحاتك جاهزة!</h3>' +
           '<p>' + total + ' تونر متاح — جولة ' + roundLabel + ' من ' + maxRounds + '</p>' +
         '</div>' +
-        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-          '<button class="rec-reset-btn" onclick="showTonerResults()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.5)">🔀 ترشيح آخر</button>' +
+        '<div class="js-flex-wrap">' +
+          '<button class="rec-reset-btn" onclick="showTonerResults()" class="js-selected">🔀 ترشيح آخر</button>' +
           '<button class="rec-reset-btn" onclick="initTonerRec()">🔄 بدء جديد</button>' +
         '</div>' +
       '</div>' +
-      '<div style="background:#fdf3dd;border-right:3px solid var(--gold);border-radius:10px;padding:8px 14px;margin-bottom:16px;font-size:0.78rem;color:#8a6000">' +
+      '<div class="js-note-gold">' +
         '🔀 <strong>جولة ' + roundLabel + ' من ' + maxRounds + ':</strong> اضغط "ترشيح آخر" عشان تشوف منتجات مختلفة' +
       '</div>' +
       '<div class="rec-cards-grid">' + cardsHTML + '</div>' +
-      '<div style="margin-bottom:12px;font-size:0.9rem;font-weight:800;color:var(--dark)">📋 رسالة جاهزة للإرسال للعميل:</div>' +
+      '<div class="js-label-lg">📋 رسالة جاهزة للإرسال للعميل:</div>' +
       '<div class="rec-copy-box">' +
         '<button class="rec-copy-btn" onclick="tonerCopyMsg(this)">📋 نسخ الرسالة</button>' +
         '<pre id="tonerCopyText">' + copyText + '</pre></div>' + renderPrecautions('toner') + '<div style="display:none">' +
       '</div>' +
-      '<div style="margin-top:16px;background:white;border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow)">' +
-        '<div style="font-size:0.88rem;font-weight:800;color:var(--dark);margin-bottom:10px">🔍 كل المنتجات (' + total + ' تونر):</div>' +
+      '<div class="js-card-sm js-mt-16">' +
+        '<div class="js-label">🔍 كل المنتجات (' + total + ' تونر):</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;max-height:280px;overflow-y:auto">' +
           pool.map(p =>
-            '<div style="background:var(--bg);border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--border)">' +
-              '<span style="font-size:0.76rem;font-weight:600;color:var(--dark);line-height:1.3">' + p.name + '</span>' +
-              '<span style="font-size:0.8rem;font-weight:800;color:var(--rose-dark);white-space:nowrap">' + p.price + ' ج</span>' +
+            '<div class="js-row-item">' +
+              '<span class="js-title-xs">' + p.name + '</span>' +
+              '<span class="js-price">' + p.price + ' ج</span>' +
             '</div>'
           ).join('') +
         '</div>' +
@@ -3531,9 +3492,9 @@ function showRecResults() {
 
   const cardsHTML = picks.map(p => `
     <div class="rec-card" style="border-top:4px solid ${p.color}">
-      <div class="rec-card-body" style="padding-top:14px">
-        <div class="rec-card-name" style="user-select:text;cursor:text">${p.card.name}</div>
-        ${p.card.desc ? `<div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;margin:6px 0 8px">${p.card.desc}</div>` : ''}
+      <div class="rec-card-body" class="js-pt-14">
+        <div class="rec-card-name" class="js-selectable">${p.card.name}</div>
+        ${p.card.desc ? `<div class="js-desc">${p.card.desc}</div>` : ''}
         <div class="rec-card-price" style="color:${p.color};font-size:1rem">
           ${p.card.code ? `كود: <strong style="font-size:1.3rem">${p.card.code}</strong>` : `${p.card.price.toLocaleString('ar-EG')} جنيه`}
         </div>
@@ -3560,7 +3521,7 @@ function showRecResults() {
           <p>${typeLabels[productType]} للبشرة ${skinLabels[skinType]} — ${pool.length} منتج متاح</p>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <button class="rec-reset-btn" onclick="reshuffleRec()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.5)">
+          <button class="rec-reset-btn" onclick="reshuffleRec()" class="js-selected">
             🔀 ترشيح آخر
           </button>
           <button class="rec-reset-btn" onclick="recReset()">🔄 بحث جديد</button>
@@ -3585,11 +3546,11 @@ function showRecResults() {
 
       ${renderPrecautions(productType === 'cleansers' ? 'cleanser' : productType === 'toners' ? 'toner' : productType === 'moisturizers' ? 'moisturizer' : productType === 'masks' ? 'mask' : productType === 'scrubs' ? 'scrub' : productType === 'eye' ? 'eye' : productType === 'whitening' ? 'whitening' : productType === 'antiaging' ? 'antiaging' : 'cleanser', 'main-rec-prec')}
 
-      <div style="margin-top:16px;background:white;border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow)">
-        <div style="font-size:0.88rem;font-weight:800;color:var(--dark);margin-bottom:10px">🔍 كل المنتجات المتاحة (${pool.length} منتج):</div>
+      <div class="js-card-sm js-mt-16">
+        <div class="js-label">🔍 كل المنتجات المتاحة (${pool.length} منتج):</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;max-height:300px;overflow-y:auto;padding-left:4px">
           ${[...pool].sort((a,b)=>a.price-b.price).map(p=>`
-            <div style="background:var(--bg);border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--border)">
+            <div class="js-row-item">
               <span style="font-size:0.78rem;font-weight:600;color:var(--dark);line-height:1.3">${p.name}</span>
               <span style="font-size:0.82rem;font-weight:800;color:var(--rose-dark);white-space:nowrap">${p.price} ج</span>
             </div>`).join('')}
@@ -3716,9 +3677,9 @@ function initMoistRec() {
       <p>اختار نوع بشرتك وهيجيلك ٣ ترشيحات من ${(window.products||{moisturizers:[]}).moisturizers.length} مرطب متاح</p>
       <div class="section-divider"></div>
     </div>
-    <div class="rec-wizard" style="max-width:700px;margin:0 auto">
+    <div class="rec-wizard" class="js-wrap-700">
       <div style="background:white;border-radius:var(--radius);padding:28px;box-shadow:var(--shadow);border-right:4px solid var(--rose)">
-        <div style="font-size:1rem;font-weight:800;color:var(--dark);margin-bottom:16px">🧴 اختار نوع البشرة:</div>
+        <div class="js-label-lg">🧴 اختار نوع البشرة:</div>
         <div class="rec-options" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">
           <button class="rec-option" onclick="moistSelectSkin('oily',this)"><span class="opt-emoji">💧</span>دهنية / مختلطة</button>
           <button class="rec-option" onclick="moistSelectSkin('dry',this)"><span class="opt-emoji">🌵</span>جافة / شديدة الجفاف</button>
@@ -3726,7 +3687,7 @@ function initMoistRec() {
           <button class="rec-option" onclick="moistSelectSkin('normal',this)"><span class="opt-emoji">😊</span>عادية / جميع الأنواع</button>
         </div>
       </div>
-      <div id="moist-results" style="margin-top:20px"></div>
+      <div id="moist-results" class="js-mt-20"></div>
     </div>
   `;
 }
@@ -3781,11 +3742,11 @@ function showMoistResults() {
 
   const cardsHTML = picks.map(p =>
     '<div class="rec-card" style="border-top:4px solid ' + p.color + '">' +
-      '<div class="rec-card-body" style="padding-top:14px">' +
-        '<div class="rec-card-name" style="user-select:text;cursor:text">' + p.card.name + '</div>' +
-        (p.card.desc ? '<div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;margin:6px 0 8px">' + p.card.desc + '</div>' : '') +
+      '<div class="rec-card-body" class="js-pt-14">' +
+        '<div class="rec-card-name" class="js-selectable">' + p.card.name + '</div>' +
+        (p.card.desc ? '<div class="js-desc">' + p.card.desc + '</div>' : '') +
         '<div class="rec-card-price" style="color:' + p.color + ';font-size:1rem">' + p.card.price.toLocaleString('ar-EG') + ' جنيه</div>' +
-        '<div style="font-size:0.72rem;color:var(--text-muted);margin:4px 0 8px">كود: <strong style="color:var(--dark)">' + p.card.code + '</strong></div>' +
+        '<div class="js-desc-xs">كود: <strong style="color:var(--dark)">' + p.card.code + '</strong></div>' +
         '<button class="rec-card-shop" style="background:' + p.color + ';border:none;cursor:pointer;width:100%;font-family:Cairo,sans-serif;font-size:0.88rem;font-weight:700;color:white;padding:10px;border-radius:8px"' +
           ' onclick="moistCopyCode(this,\'' + p.card.code + '\')">' +
           '📋 نسخ الكود' +
@@ -3801,27 +3762,27 @@ function showMoistResults() {
           '<h3>✅ ترشيحات البشرة ' + skinLabels[skinType] + '</h3>' +
           '<p>' + total + ' مرطب متاح — جولة ' + roundLabel + ' من ' + maxRounds + '</p>' +
         '</div>' +
-        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-          '<button class="rec-reset-btn" onclick="showMoistResults()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.5)">🔀 ترشيح آخر</button>' +
+        '<div class="js-flex-wrap">' +
+          '<button class="rec-reset-btn" onclick="showMoistResults()" class="js-selected">🔀 ترشيح آخر</button>' +
           '<button class="rec-reset-btn" onclick="initMoistRec()">🔄 بحث جديد</button>' +
         '</div>' +
       '</div>' +
-      '<div style="background:#fdf3dd;border-right:3px solid var(--gold);border-radius:10px;padding:8px 14px;margin-bottom:16px;font-size:0.78rem;color:#8a6000">' +
+      '<div class="js-note-gold">' +
         '🔀 <strong>جولة ' + roundLabel + ' من ' + maxRounds + ':</strong> اضغط "ترشيح آخر" عشان تشوف منتجات مختلفة' +
       '</div>' +
       '<div class="rec-cards-grid">' + cardsHTML + '</div>' +
-      '<div style="margin-bottom:12px;font-size:0.9rem;font-weight:800;color:var(--dark)">📋 رسالة جاهزة للإرسال للعميل:</div>' +
+      '<div class="js-label-lg">📋 رسالة جاهزة للإرسال للعميل:</div>' +
       '<div class="rec-copy-box">' +
         '<button class="rec-copy-btn" onclick="moistCopyMsg(this)">📋 نسخ الرسالة</button>' +
         '<pre id="moistCopyText">' + copyText + '</pre></div>' + renderPrecautions('moisturizer') + '<div style="display:none">' +
       '</div>' +
-      '<div style="margin-top:16px;background:white;border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow)">' +
-        '<div style="font-size:0.88rem;font-weight:800;color:var(--dark);margin-bottom:10px">🔍 كل المنتجات المتاحة (' + total + ' مرطب):</div>' +
+      '<div class="js-card-sm js-mt-16">' +
+        '<div class="js-label">🔍 كل المنتجات المتاحة (' + total + ' مرطب):</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;max-height:280px;overflow-y:auto">' +
           pool.map(p =>
-            '<div style="background:var(--bg);border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--border)">' +
-              '<span style="font-size:0.76rem;font-weight:600;color:var(--dark);line-height:1.3">' + p.name + '</span>' +
-              '<span style="font-size:0.8rem;font-weight:800;color:var(--rose-dark);white-space:nowrap">' + p.price + ' ج</span>' +
+            '<div class="js-row-item">' +
+              '<span class="js-title-xs">' + p.name + '</span>' +
+              '<span class="js-price">' + p.price + ' ج</span>' +
             '</div>'
           ).join('') +
         '</div>' +
@@ -3882,9 +3843,9 @@ function initMasksRec() {
       <p>اختار نوع بشرتك وهيجيلك ٣ ترشيحات من ${(window.products||{masks:[]}).masks.length} ماسك متاح</p>
       <div class="section-divider"></div>
     </div>
-    <div class="rec-wizard" style="max-width:700px;margin:0 auto">
+    <div class="rec-wizard" class="js-wrap-700">
       <div style="background:white;border-radius:var(--radius);padding:28px;box-shadow:var(--shadow);border-right:4px solid var(--rose)">
-        <div style="font-size:1rem;font-weight:800;color:var(--dark);margin-bottom:16px">🎭 اختار نوع البشرة:</div>
+        <div class="js-label-lg">🎭 اختار نوع البشرة:</div>
         <div class="rec-options" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">
           <button class="rec-option" onclick="masksSelectSkin('oily',this)"><span class="opt-emoji">💧</span>دهنية / مختلطة</button>
           <button class="rec-option" onclick="masksSelectSkin('dry',this)"><span class="opt-emoji">🌵</span>جافة</button>
@@ -3892,7 +3853,7 @@ function initMasksRec() {
           <button class="rec-option" onclick="masksSelectSkin('normal',this)"><span class="opt-emoji">😊</span>عادية / جميع الأنواع</button>
         </div>
       </div>
-      <div id="masks-results" style="margin-top:20px"></div>
+      <div id="masks-results" class="js-mt-20"></div>
     </div>
   `;
 }
@@ -3945,11 +3906,11 @@ function showMasksResults() {
 
   const cardsHTML = picks.map(p =>
     '<div class="rec-card" style="border-top:4px solid ' + p.color + '">' +
-      '<div class="rec-card-body" style="padding-top:14px">' +
-        '<div class="rec-card-name" style="user-select:text;cursor:text">' + p.card.name + '</div>' +
-        (p.card.desc ? '<div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;margin:6px 0 8px">' + p.card.desc + '</div>' : '') +
+      '<div class="rec-card-body" class="js-pt-14">' +
+        '<div class="rec-card-name" class="js-selectable">' + p.card.name + '</div>' +
+        (p.card.desc ? '<div class="js-desc">' + p.card.desc + '</div>' : '') +
         '<div class="rec-card-price" style="color:' + p.color + ';font-size:1rem">' + p.card.price.toLocaleString('ar-EG') + ' جنيه</div>' +
-        '<div style="font-size:0.72rem;color:var(--text-muted);margin:4px 0 8px">كود: <strong style="color:var(--dark)">' + p.card.code + '</strong></div>' +
+        '<div class="js-desc-xs">كود: <strong style="color:var(--dark)">' + p.card.code + '</strong></div>' +
         '<button class="rec-card-shop" style="background:' + p.color + ';border:none;cursor:pointer;width:100%;font-family:Cairo,sans-serif;font-size:0.88rem;font-weight:700;color:white;padding:10px;border-radius:8px"' +
           ' onclick="masksCopyCode(this,\'' + p.card.code + '\')">' +
           '📋 نسخ الكود' +
@@ -3963,27 +3924,27 @@ function showMasksResults() {
       '<div class="rec-result-header">' +
         '<div><h3>✅ ترشيحات الماسكات للبشرة ' + skinLabels[skinType] + '</h3>' +
         '<p>' + total + ' ماسك متاح — جولة ' + roundLabel + ' من ' + maxRounds + '</p></div>' +
-        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-          '<button class="rec-reset-btn" onclick="showMasksResults()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.5)">🔀 ترشيح آخر</button>' +
+        '<div class="js-flex-wrap">' +
+          '<button class="rec-reset-btn" onclick="showMasksResults()" class="js-selected">🔀 ترشيح آخر</button>' +
           '<button class="rec-reset-btn" onclick="initMasksRec()">🔄 بحث جديد</button>' +
         '</div>' +
       '</div>' +
-      '<div style="background:#fdf3dd;border-right:3px solid var(--gold);border-radius:10px;padding:8px 14px;margin-bottom:16px;font-size:0.78rem;color:#8a6000">' +
+      '<div class="js-note-gold">' +
         '🔀 <strong>جولة ' + roundLabel + ' من ' + maxRounds + ':</strong> اضغط "ترشيح آخر" عشان تشوف ماسكات مختلفة' +
       '</div>' +
       '<div class="rec-cards-grid">' + cardsHTML + '</div>' +
-      '<div style="margin-bottom:12px;font-size:0.9rem;font-weight:800;color:var(--dark)">📋 رسالة جاهزة للإرسال للعميل:</div>' +
+      '<div class="js-label-lg">📋 رسالة جاهزة للإرسال للعميل:</div>' +
       '<div class="rec-copy-box">' +
         '<button class="rec-copy-btn" onclick="masksCopyMsg(this)">📋 نسخ الرسالة</button>' +
         '<pre id="masksCopyText">' + copyText + '</pre></div>' + renderPrecautions('mask') + '<div style="display:none">' +
       '</div>' +
-      '<div style="margin-top:16px;background:white;border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow)">' +
-        '<div style="font-size:0.88rem;font-weight:800;color:var(--dark);margin-bottom:10px">🔍 كل الماسكات المتاحة (' + total + ' ماسك):</div>' +
+      '<div class="js-card-sm js-mt-16">' +
+        '<div class="js-label">🔍 كل الماسكات المتاحة (' + total + ' ماسك):</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;max-height:280px;overflow-y:auto">' +
           pool.map(p =>
-            '<div style="background:var(--bg);border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--border)">' +
-              '<span style="font-size:0.76rem;font-weight:600;color:var(--dark);line-height:1.3">' + p.name + '</span>' +
-              '<span style="font-size:0.8rem;font-weight:800;color:var(--rose-dark);white-space:nowrap">' + p.price + ' ج</span>' +
+            '<div class="js-row-item">' +
+              '<span class="js-title-xs">' + p.name + '</span>' +
+              '<span class="js-price">' + p.price + ' ج</span>' +
             '</div>'
           ).join('') +
         '</div>' +
@@ -4045,9 +4006,9 @@ function initScrubsRec() {
       <p>اختار نوع بشرتك وهيجيلك ٣ ترشيحات من ${total} مقشّر متاح</p>
       <div class="section-divider"></div>
     </div>
-    <div class="rec-wizard" style="max-width:700px;margin:0 auto">
+    <div class="rec-wizard" class="js-wrap-700">
       <div style="background:white;border-radius:var(--radius);padding:28px;box-shadow:var(--shadow);border-right:4px solid var(--rose)">
-        <div style="font-size:1rem;font-weight:800;color:var(--dark);margin-bottom:16px">✨ اختار نوع البشرة:</div>
+        <div class="js-label-lg">✨ اختار نوع البشرة:</div>
         <div class="rec-options" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">
           <button class="rec-option" onclick="scrubsSelectSkin('oily',this)"><span class="opt-emoji">💧</span>دهنية / مختلطة</button>
           <button class="rec-option" onclick="scrubsSelectSkin('dry',this)"><span class="opt-emoji">🌵</span>جافة / خشنة</button>
@@ -4055,7 +4016,7 @@ function initScrubsRec() {
           <button class="rec-option" onclick="scrubsSelectSkin('normal',this)"><span class="opt-emoji">😊</span>عادية / جميع الأنواع</button>
         </div>
       </div>
-      <div id="scrubs-results" style="margin-top:20px"></div>
+      <div id="scrubs-results" class="js-mt-20"></div>
     </div>
   `;
 }
@@ -4108,11 +4069,11 @@ function showScrubsResults() {
 
   const cardsHTML = picks.map(p =>
     '<div class="rec-card" style="border-top:4px solid ' + p.color + '">' +
-      '<div class="rec-card-body" style="padding-top:14px">' +
-        '<div class="rec-card-name" style="user-select:text;cursor:text">' + p.card.name + '</div>' +
-        (p.card.desc ? '<div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;margin:6px 0 8px">' + p.card.desc + '</div>' : '') +
+      '<div class="rec-card-body" class="js-pt-14">' +
+        '<div class="rec-card-name" class="js-selectable">' + p.card.name + '</div>' +
+        (p.card.desc ? '<div class="js-desc">' + p.card.desc + '</div>' : '') +
         '<div class="rec-card-price" style="color:' + p.color + ';font-size:1rem">' + p.card.price.toLocaleString('ar-EG') + ' جنيه</div>' +
-        '<div style="font-size:0.72rem;color:var(--text-muted);margin:4px 0 8px">كود: <strong style="color:var(--dark)">' + p.card.code + '</strong></div>' +
+        '<div class="js-desc-xs">كود: <strong style="color:var(--dark)">' + p.card.code + '</strong></div>' +
         '<button class="rec-card-shop" style="background:' + p.color + ';border:none;cursor:pointer;width:100%;font-family:Cairo,sans-serif;font-size:0.88rem;font-weight:700;color:white;padding:10px;border-radius:8px"' +
           ' onclick="scrubsCopyCode(this,\'' + p.card.code + '\')">' +
           '📋 نسخ الكود' +
@@ -4126,27 +4087,27 @@ function showScrubsResults() {
       '<div class="rec-result-header">' +
         '<div><h3>✅ ترشيحات المقشرات للبشرة ' + skinLabels[skinType] + '</h3>' +
         '<p>' + total + ' مقشّر متاح — جولة ' + roundLabel + ' من ' + maxRounds + '</p></div>' +
-        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-          '<button class="rec-reset-btn" onclick="showScrubsResults()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.5)">🔀 ترشيح آخر</button>' +
+        '<div class="js-flex-wrap">' +
+          '<button class="rec-reset-btn" onclick="showScrubsResults()" class="js-selected">🔀 ترشيح آخر</button>' +
           '<button class="rec-reset-btn" onclick="initScrubsRec()">🔄 بحث جديد</button>' +
         '</div>' +
       '</div>' +
-      '<div style="background:#fdf3dd;border-right:3px solid var(--gold);border-radius:10px;padding:8px 14px;margin-bottom:16px;font-size:0.78rem;color:#8a6000">' +
+      '<div class="js-note-gold">' +
         '🔀 <strong>جولة ' + roundLabel + ' من ' + maxRounds + ':</strong> اضغط "ترشيح آخر" عشان تشوف مقشرات مختلفة' +
       '</div>' +
       '<div class="rec-cards-grid">' + cardsHTML + '</div>' +
-      '<div style="margin-bottom:12px;font-size:0.9rem;font-weight:800;color:var(--dark)">📋 رسالة جاهزة للإرسال للعميل:</div>' +
+      '<div class="js-label-lg">📋 رسالة جاهزة للإرسال للعميل:</div>' +
       '<div class="rec-copy-box">' +
         '<button class="rec-copy-btn" onclick="scrubsCopyMsg(this)">📋 نسخ الرسالة</button>' +
         '<pre id="scrubsCopyText">' + copyText + '</pre></div>' + renderPrecautions('scrub') + '<div style="display:none">' +
       '</div>' +
-      '<div style="margin-top:16px;background:white;border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow)">' +
-        '<div style="font-size:0.88rem;font-weight:800;color:var(--dark);margin-bottom:10px">🔍 كل المقشرات المتاحة (' + total + ' منتج):</div>' +
+      '<div class="js-card-sm js-mt-16">' +
+        '<div class="js-label">🔍 كل المقشرات المتاحة (' + total + ' منتج):</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;max-height:280px;overflow-y:auto">' +
           pool.map(p =>
-            '<div style="background:var(--bg);border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--border)">' +
-              '<span style="font-size:0.76rem;font-weight:600;color:var(--dark);line-height:1.3">' + p.name + '</span>' +
-              '<span style="font-size:0.8rem;font-weight:800;color:var(--rose-dark);white-space:nowrap">' + p.price + ' ج</span>' +
+            '<div class="js-row-item">' +
+              '<span class="js-title-xs">' + p.name + '</span>' +
+              '<span class="js-price">' + p.price + ' ج</span>' +
             '</div>'
           ).join('') +
         '</div>' +
@@ -4180,7 +4141,11 @@ function scrubsCopyMsg(btn) {
 
 // ===== EYE PRODUCTS DATA =====
 /* Data moved to eye_products.json */
-  fetch("assets/data/eye_products.json").then(r=>r.json()).then(d=>{ window.eyeProducts = d; });
+  fetch("assets/data/eye_products.json").then(r=>r.json()).then(d=>{
+    window.eyeProducts = d;
+    var el = document.getElementById('sec-eye-all');
+    if (el) { delete el.dataset.loaded; renderEye(); }
+  });
 
 // ===== EYE RECOMMENDER =====
 sectionTitles['eye_rec'] = '👁️ مرشح محيط العين الذكي';
@@ -4198,9 +4163,9 @@ function initEyeRec() {
       <p>اختار المشكلة ونوع المستحضر المطلوب وهيجيلك أفضل الترشيحات من ${total} منتج</p>
       <div class="section-divider"></div>
     </div>
-    <div style="max-width:800px;margin:0 auto">
+    <div class="js-wrap-800">
       <div style="background:white;border-radius:var(--radius);padding:28px;box-shadow:var(--shadow);border-right:4px solid var(--rose);margin-bottom:20px">
-        <div style="font-size:1rem;font-weight:800;color:var(--dark);margin-bottom:16px">🎯 Step 1 — اختار المشكلة:</div>
+        <div class="js-label-lg">🎯 Step 1 — اختار المشكلة:</div>
         <div class="rec-options" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
           <button class="rec-option" onclick="eyeSelectProblem('dark',this)"><span class="opt-emoji">🌑</span>هالات سوداء</button>
           <button class="rec-option" onclick="eyeSelectProblem('puffiness',this)"><span class="opt-emoji">💧</span>انتفاخات</button>
@@ -4210,7 +4175,7 @@ function initEyeRec() {
         </div>
       </div>
       <div id="eye-type-step" style="display:none;background:white;border-radius:var(--radius);padding:28px;box-shadow:var(--shadow);border-right:4px solid var(--gold);margin-bottom:20px">
-        <div style="font-size:1rem;font-weight:800;color:var(--dark);margin-bottom:16px">🧴 Step 2 — اختار نوع المستحضر:</div>
+        <div class="js-label-lg">🧴 Step 2 — اختار نوع المستحضر:</div>
         <div id="eye-type-options" class="rec-options" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))"></div>
       </div>
       <div id="eye-results" style="margin-top:4px"></div>
@@ -4307,11 +4272,11 @@ function showEyeResults() {
 
   const cardsHTML = picks.map((p,i) =>
     `<div class="rec-card" style="border-top:4px solid ${colors[i]}">
-      <div class="rec-card-body" style="padding-top:14px">
-        <div class="rec-card-name" style="user-select:text;cursor:text">${p.name}</div>
-        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;margin:6px 0 8px">${p.desc}</div>
+      <div class="rec-card-body" class="js-pt-14">
+        <div class="rec-card-name" class="js-selectable">${p.name}</div>
+        <div class="js-desc">${p.desc}</div>
         <div class="rec-card-price" style="color:${colors[i]};font-size:1rem">${p.price.toLocaleString('ar-EG')} جنيه</div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin:4px 0 8px">كود: <strong style="color:var(--dark)">${p.code}</strong></div>
+        <div class="js-desc-xs">كود: <strong style="color:var(--dark)">${p.code}</strong></div>
         <button class="rec-card-shop" style="background:${colors[i]};border:none;cursor:pointer;width:100%;font-family:Cairo,sans-serif;font-size:0.88rem;font-weight:700;color:white;padding:10px;border-radius:8px"
           onclick="eyeCopyCode(this,'${p.code}')">📋 نسخ الكود</button>
       </div>
@@ -4323,16 +4288,16 @@ function showEyeResults() {
       <div class="rec-result-header">
         <div><h3>✅ ${eyeProblemLabels[problem]} — ${typeLabel}</h3>
         <p>${total} منتج متاح — جولة ${roundLabel} من ${maxRounds}</p></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="rec-reset-btn" onclick="showEyeResults()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.5)">🔀 ترشيح آخر</button>
+        <div class="js-flex-wrap">
+          <button class="rec-reset-btn" onclick="showEyeResults()" class="js-selected">🔀 ترشيح آخر</button>
           <button class="rec-reset-btn" onclick="initEyeRec()">🔄 بحث جديد</button>
         </div>
       </div>
-      <div style="background:#fdf3dd;border-right:3px solid var(--gold);border-radius:10px;padding:8px 14px;margin-bottom:16px;font-size:0.78rem;color:#8a6000">
+      <div class="js-note-gold">
         🔀 <strong>جولة ${roundLabel} من ${maxRounds}:</strong> اضغط "ترشيح آخر" عشان تشوف منتجات مختلفة
       </div>
       <div class="rec-cards-grid">${cardsHTML}</div>
-      <div style="margin-bottom:12px;font-size:0.9rem;font-weight:800;color:var(--dark)">📋 رسالة جاهزة للإرسال للعميل:</div>
+      <div class="js-label-lg">📋 رسالة جاهزة للإرسال للعميل:</div>
       <div class="rec-copy-box">
         <button class="rec-copy-btn" onclick="eyeCopyMsg(this)">📋 نسخ الرسالة</button>
         <pre id="eyeCopyText">${copyText}</pre>
@@ -4340,13 +4305,13 @@ function showEyeResults() {
       ${renderPrecautions('eye','eye-prec')}
       <div style="display:none">
       </div>
-      <div style="margin-top:16px;background:white;border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow)">
-        <div style="font-size:0.88rem;font-weight:800;color:var(--dark);margin-bottom:10px">🔍 كل المنتجات المتاحة (${total} منتج):</div>
+      <div class="js-card-sm js-mt-16">
+        <div class="js-label">🔍 كل المنتجات المتاحة (${total} منتج):</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;max-height:300px;overflow-y:auto">
           ${pool.map(p =>
-            `<div style="background:var(--bg);border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--border)">
-              <span style="font-size:0.76rem;font-weight:600;color:var(--dark);line-height:1.3">${p.name}</span>
-              <span style="font-size:0.8rem;font-weight:800;color:var(--rose-dark);white-space:nowrap">${p.price} ج</span>
+            `<div class="js-row-item">
+              <span class="js-title-xs">${p.name}</span>
+              <span class="js-price">${p.price} ج</span>
             </div>`
           ).join('')}
         </div>
@@ -4380,7 +4345,11 @@ function eyeCopyMsg(btn) {
 
 // ===== ACNE PRODUCTS DATA =====
 /* Data moved to acne_products.json */
-  fetch("assets/data/acne_products.json").then(r=>r.json()).then(d=>{ window.acneProducts = d; });
+  fetch("assets/data/acne_products.json").then(r=>r.json()).then(d=>{
+    window.acneProducts = d;
+    var el = document.getElementById('sec-acne-all');
+    if (el) { delete el.dataset.loaded; renderAcne(); }
+  });
 
 // ===== ACNE RECOMMENDER =====
 sectionTitles['acne_rec'] = '💊 مرشح الحبوب الذكي';
@@ -4415,9 +4384,9 @@ function initAcneRec() {
       <p>اختار المشكلة ونوع المستحضر وهيجيلك أفضل الترشيحات من ${total} منتج</p>
       <div class="section-divider"></div>
     </div>
-    <div style="max-width:800px;margin:0 auto">
+    <div class="js-wrap-800">
       <div style="background:white;border-radius:var(--radius);padding:28px;box-shadow:var(--shadow);border-right:4px solid var(--rose);margin-bottom:20px">
-        <div style="font-size:1rem;font-weight:800;color:var(--dark);margin-bottom:16px">🎯 Step 1 — اختار المشكلة:</div>
+        <div class="js-label-lg">🎯 Step 1 — اختار المشكلة:</div>
         <div class="rec-options" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">
           <button class="rec-option" onclick="acneSelectProblem('active',this)"><span class="opt-emoji">🔴</span>حبوب نشطة والتهابات</button>
           <button class="rec-option" onclick="acneSelectProblem('blackheads',this)"><span class="opt-emoji">⚫</span>رؤوس سوداء وبيضاء</button>
@@ -4426,7 +4395,7 @@ function initAcneRec() {
         </div>
       </div>
       <div id="acne-type-step" style="display:none;background:white;border-radius:var(--radius);padding:28px;box-shadow:var(--shadow);border-right:4px solid var(--gold);margin-bottom:20px">
-        <div style="font-size:1rem;font-weight:800;color:var(--dark);margin-bottom:16px">🧴 Step 2 — اختار نوع المستحضر:</div>
+        <div class="js-label-lg">🧴 Step 2 — اختار نوع المستحضر:</div>
         <div id="acne-type-options" class="rec-options" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))"></div>
       </div>
       <div id="acne-results"></div>
@@ -4503,11 +4472,11 @@ function showAcneResults() {
 
   const cardsHTML = picks.map((p,i) => `
     <div class="rec-card" style="border-top:4px solid ${colors[i]}">
-      <div class="rec-card-body" style="padding-top:14px">
-        <div class="rec-card-name" style="user-select:text;cursor:text">${p.name}</div>
-        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;margin:6px 0 8px">${p.desc}</div>
+      <div class="rec-card-body" class="js-pt-14">
+        <div class="rec-card-name" class="js-selectable">${p.name}</div>
+        <div class="js-desc">${p.desc}</div>
         <div class="rec-card-price" style="color:${colors[i]};font-size:1rem">${p.price.toLocaleString('ar-EG')} جنيه</div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin:4px 0 8px">كود: <strong style="color:var(--dark)">${p.code}</strong></div>
+        <div class="js-desc-xs">كود: <strong style="color:var(--dark)">${p.code}</strong></div>
         <button class="rec-card-shop" style="background:${colors[i]};border:none;cursor:pointer;width:100%;font-family:Cairo,sans-serif;font-size:0.88rem;font-weight:700;color:white;padding:10px;border-radius:8px"
           onclick="acneCopyCode(this,'${p.code}')">📋 نسخ الكود</button>
       </div>
@@ -4518,16 +4487,16 @@ function showAcneResults() {
       <div class="rec-result-header">
         <div><h3>✅ ${acneProblemLabels[problem]} — ${typeLabel}</h3>
         <p>${total} منتج متاح — جولة ${roundLabel} من ${maxRounds}</p></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="rec-reset-btn" onclick="showAcneResults()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.5)">🔀 ترشيح آخر</button>
+        <div class="js-flex-wrap">
+          <button class="rec-reset-btn" onclick="showAcneResults()" class="js-selected">🔀 ترشيح آخر</button>
           <button class="rec-reset-btn" onclick="initAcneRec()">🔄 بحث جديد</button>
         </div>
       </div>
-      <div style="background:#fdf3dd;border-right:3px solid var(--gold);border-radius:10px;padding:8px 14px;margin-bottom:16px;font-size:0.78rem;color:#8a6000">
+      <div class="js-note-gold">
         🔀 <strong>جولة ${roundLabel} من ${maxRounds}:</strong> اضغط "ترشيح آخر" عشان تشوف منتجات مختلفة
       </div>
       <div class="rec-cards-grid">${cardsHTML}</div>
-      <div style="margin-bottom:12px;font-size:0.9rem;font-weight:800;color:var(--dark)">📋 رسالة جاهزة للإرسال للعميل:</div>
+      <div class="js-label-lg">📋 رسالة جاهزة للإرسال للعميل:</div>
       <div class="rec-copy-box">
         <button class="rec-copy-btn" onclick="acneCopyMsg(this)">📋 نسخ الرسالة</button>
         <pre id="acneCopyText">${copyText}</pre>
@@ -4535,13 +4504,13 @@ function showAcneResults() {
       ${renderPrecautions('acne','acne-prec')}
       <div style="display:none">
       </div>
-      <div style="margin-top:16px;background:white;border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow)">
-        <div style="font-size:0.88rem;font-weight:800;color:var(--dark);margin-bottom:10px">🔍 كل المنتجات المتاحة (${total} منتج):</div>
+      <div class="js-card-sm js-mt-16">
+        <div class="js-label">🔍 كل المنتجات المتاحة (${total} منتج):</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;max-height:300px;overflow-y:auto">
           ${pool.map(p => `
-            <div style="background:var(--bg);border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--border)">
-              <span style="font-size:0.76rem;font-weight:600;color:var(--dark);line-height:1.3">${p.name}</span>
-              <span style="font-size:0.8rem;font-weight:800;color:var(--rose-dark);white-space:nowrap">${p.price} ج</span>
+            <div class="js-row-item">
+              <span class="js-title-xs">${p.name}</span>
+              <span class="js-price">${p.price} ج</span>
             </div>`).join('')}
         </div>
       </div>
@@ -4592,10 +4561,10 @@ function renderAntiAging() {
 
   // Search + Filter UI
   el.innerHTML = ''
-    + '<div style="background:white;border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow);margin-bottom:20px;border-right:4px solid var(--gold)">'
-    + '<div style="font-size:0.88rem;font-weight:800;color:var(--dark);margin-bottom:10px">🔍 بحث في منتجات Anti-Aging</div>'
+    + '<div class="js-card-sm-gold">'
+    + '<div class="js-label">🔍 بحث في منتجات Anti-Aging</div>'
     + '<input id="aaSearch" type="text" placeholder="ابحث باسم المنتج أو الكود..." oninput="filterAntiAging()" style="width:100%;padding:11px 16px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:Cairo,sans-serif;font-size:0.92rem;outline:none;box-sizing:border-box;margin-bottom:12px">'
-    + '<div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-bottom:6px">المشكلة</div>'
+    + '<div class="js-label-xs">المشكلة</div>'
     + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px" id="aaFilterProb">'
     + '<button onclick="filterAntiAging(this,\'aaFilterProb\')" class="dyes-filter-btn active" data-prob="all">الكل</button>'
     + '<button onclick="filterAntiAging(this,\'aaFilterProb\')" class="dyes-filter-btn" data-prob="wrinkles">〰️ تجاعيد</button>'
@@ -4603,7 +4572,7 @@ function renderAntiAging() {
     + '<button onclick="filterAntiAging(this,\'aaFilterProb\')" class="dyes-filter-btn" data-prob="dryness">🌵 جفاف عميق</button>'
     + '<button onclick="filterAntiAging(this,\'aaFilterProb\')" class="dyes-filter-btn" data-prob="spots">🟤 بقع داكنة</button>'
     + '</div>'
-    + '<div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-bottom:6px">نوع المستحضر</div>'
+    + '<div class="js-label-xs">نوع المستحضر</div>'
     + '<div style="display:flex;flex-wrap:wrap;gap:6px" id="aaFilterType">'
     + '<button onclick="filterAntiAging(this,\'aaFilterType\')" class="dyes-filter-btn active" data-type="all">الكل</button>'
     + '<button onclick="filterAntiAging(this,\'aaFilterType\')" class="dyes-filter-btn" data-type="serum">💧 سيروم</button>'
@@ -4688,9 +4657,9 @@ function initAntiAgingRec() {
   antiAgingRecState = { problem: null, type: null, round: 0 };
   var total = (window.antiAgingProducts || []).length;
   sec.innerHTML = '<div class="section-header"><h2>🎯 مرشح Anti-Aging الذكي</h2><p>اختار المشكلة ونوع المستحضر وهيجيلك أفضل الترشيحات من ' + total + ' منتج</p><div class="section-divider"></div></div>'
-    + '<div style="max-width:800px;margin:0 auto">'
+    + '<div class="js-wrap-800">'
     + '<div style="background:white;border-radius:var(--radius);padding:28px;box-shadow:var(--shadow);border-right:4px solid var(--rose);margin-bottom:20px">'
-    + '<div style="font-size:1rem;font-weight:800;color:var(--dark);margin-bottom:16px">🎯 Step 1 — اختار المشكلة:</div>'
+    + '<div class="js-label-lg">🎯 Step 1 — اختار المشكلة:</div>'
     + '<div class="rec-options" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">'
     + '<button class="rec-option" onclick="antiAgingSelProb(\'wrinkles\',this)"><span class="opt-emoji">〰️</span>تجاعيد وخطوط رفيعة</button>'
     + '<button class="rec-option" onclick="antiAgingSelProb(\'firmness\',this)"><span class="opt-emoji">🏋️</span>فقدان المرونة وترهل</button>'
@@ -4698,7 +4667,7 @@ function initAntiAgingRec() {
     + '<button class="rec-option" onclick="antiAgingSelProb(\'spots\',this)"><span class="opt-emoji">🟤</span>بقع داكنة وتفاوت اللون</button>'
     + '</div></div>'
     + '<div id="aa-type-step" style="display:none;background:white;border-radius:var(--radius);padding:28px;box-shadow:var(--shadow);border-right:4px solid var(--gold);margin-bottom:20px">'
-    + '<div style="font-size:1rem;font-weight:800;color:var(--dark);margin-bottom:16px">🧴 Step 2 — اختار نوع المستحضر:</div>'
+    + '<div class="js-label-lg">🧴 Step 2 — اختار نوع المستحضر:</div>'
     + '<div id="aa-type-opts" class="rec-options" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))"></div>'
     + '</div>'
     + '<div id="aa-results"></div></div>';
@@ -4780,19 +4749,19 @@ function showAAResults() {
 
   var cardsHTML = picks.map(function(p, i){
     return '<div class="rec-card" style="border-top:4px solid ' + colors[i] + '">'
-      + '<div class="rec-card-body" style="padding-top:14px">'
-      + '<div class="rec-card-name" style="user-select:text;cursor:text">' + p.name + '</div>'
-      + (p.desc ? '<div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;margin:6px 0 8px">' + p.desc + '</div>' : '')
+      + '<div class="rec-card-body" class="js-pt-14">'
+      + '<div class="rec-card-name" class="js-selectable">' + p.name + '</div>'
+      + (p.desc ? '<div class="js-desc">' + p.desc + '</div>' : '')
       + '<div class="rec-card-price" style="color:' + colors[i] + ';font-size:1rem">' + p.price.toLocaleString('ar-EG') + ' جنيه</div>'
-      + '<div style="font-size:0.72rem;color:var(--text-muted);margin:4px 0 8px">كود: <strong style="color:var(--dark)">' + p.code + '</strong></div>'
+      + '<div class="js-desc-xs">كود: <strong style="color:var(--dark)">' + p.code + '</strong></div>'
       + '<button class="rec-card-shop" style="background:' + colors[i] + ';border:none;cursor:pointer;width:100%;font-family:Cairo,sans-serif;font-size:0.88rem;font-weight:700;color:white;padding:10px;border-radius:8px" onclick="aaCopyCode(this,\'' + p.code + '\')">📋 نسخ الكود</button>'
       + '</div></div>';
   }).join('');
 
   var allList = pool.map(function(p){
-    return '<div style="background:var(--bg);border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--border)">'
-      + '<span style="font-size:0.76rem;font-weight:600;color:var(--dark);line-height:1.3">' + p.name + '</span>'
-      + '<span style="font-size:0.8rem;font-weight:800;color:var(--rose-dark);white-space:nowrap">' + p.price + ' ج</span>'
+    return '<div class="js-row-item">'
+      + '<span class="js-title-xs">' + p.name + '</span>'
+      + '<span class="js-price">' + p.price + ' ج</span>'
       + '</div>';
   }).join('');
 
@@ -4801,18 +4770,18 @@ function showAAResults() {
     + '<div class="rec-result-header">'
     + '<div><h3>✅ ' + probLabel + ' — ' + typeLabel + '</h3>'
     + '<p>' + total + ' منتج متاح — جولة ' + roundLabel + ' من ' + maxRounds + '</p></div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
-    + '<button class="rec-reset-btn" onclick="showAAResults()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.5)">🔀 ترشيح آخر</button>'
+    + '<div class="js-flex-wrap">'
+    + '<button class="rec-reset-btn" onclick="showAAResults()" class="js-selected">🔀 ترشيح آخر</button>'
     + '<button class="rec-reset-btn" onclick="initAntiAgingRec()">🔄 بحث جديد</button>'
     + '</div></div>'
-    + '<div style="background:#fdf3dd;border-right:3px solid var(--gold);border-radius:10px;padding:8px 14px;margin-bottom:16px;font-size:0.78rem;color:#8a6000">'
+    + '<div class="js-note-gold">'
     + '🔀 <strong>جولة ' + roundLabel + ' من ' + maxRounds + ':</strong> اضغط "ترشيح آخر" عشان تشوف منتجات مختلفة</div>'
     + '<div class="rec-cards-grid">' + cardsHTML + '</div>'
-    + '<div style="margin-bottom:12px;font-size:0.9rem;font-weight:800;color:var(--dark)">📋 رسالة جاهزة للإرسال للعميل:</div>'
+    + '<div class="js-label-lg">📋 رسالة جاهزة للإرسال للعميل:</div>'
     + '<div class="rec-copy-box"><button class="rec-copy-btn" onclick="aaCopyMsg(this)">📋 نسخ الرسالة</button>'
     + '<pre id="aaCopyText">' + copyText + '</pre></div>' + renderPrecautions('antiaging')
-    + '<div style="margin-top:16px;background:white;border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow)">'
-    + '<div style="font-size:0.88rem;font-weight:800;color:var(--dark);margin-bottom:10px">🔍 كل المنتجات المتاحة (' + total + ' منتج):</div>'
+    + '<div class="js-card-sm js-mt-16">'
+    + '<div class="js-label">🔍 كل المنتجات المتاحة (' + total + ' منتج):</div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;max-height:300px;overflow-y:auto">' + allList + '</div>'
     + '</div></div>';
 }
@@ -4844,7 +4813,11 @@ function aaCopyMsg(btn) {
 
 // ===== WHITENING STORE PRODUCTS DATA =====
 /* Data moved to whitening_store_products.json */
-  fetch("assets/data/whitening_store_products.json").then(r=>r.json()).then(d=>{ window.whiteningStoreProducts = d; });
+  fetch("assets/data/whitening_store_products.json").then(r=>r.json()).then(d=>{
+    window.whiteningStoreProducts = d;
+    var el = document.getElementById('sec-white-store');
+    if (el) { delete el.dataset.loaded; renderWhiteningStore(); }
+  });
 
 // ===== RENDER ALL WHITENING PRODUCTS =====
 function renderWhiteningStore() {
@@ -4911,9 +4884,9 @@ function initWhiteningRec() {
     + '<h2>🎯 مرشح التفتيح الذكي</h2>'
     + '<p>اختار مكان التفتيح ونوع المستحضر وهيجيلك أفضل الترشيحات من ' + total + ' منتج</p>'
     + '<div class="section-divider"></div></div>'
-    + '<div style="max-width:800px;margin:0 auto">'
+    + '<div class="js-wrap-800">'
     + '<div style="background:white;border-radius:var(--radius);padding:28px;box-shadow:var(--shadow);border-right:4px solid var(--rose);margin-bottom:20px">'
-    + '<div style="font-size:1rem;font-weight:800;color:var(--dark);margin-bottom:16px">📍 Step 1 — اختار مكان التفتيح:</div>'
+    + '<div class="js-label-lg">📍 Step 1 — اختار مكان التفتيح:</div>'
     + '<div class="rec-options" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr))">'
     + '<button class="rec-option" onclick="whiteningSelLoc(\'face\',this)"><span class="opt-emoji">🌸</span>وجه</button>'
     + '<button class="rec-option" onclick="whiteningSelLoc(\'sensitive_area\',this)"><span class="opt-emoji">💜</span>مناطق حساسة</button>'
@@ -4921,7 +4894,7 @@ function initWhiteningRec() {
     + '<button class="rec-option" onclick="whiteningSelLoc(\'body\',this)"><span class="opt-emoji">🧴</span>جسم كامل</button>'
     + '</div></div>'
     + '<div id="w-type-step" style="display:none;background:white;border-radius:var(--radius);padding:28px;box-shadow:var(--shadow);border-right:4px solid var(--gold);margin-bottom:20px">'
-    + '<div style="font-size:1rem;font-weight:800;color:var(--dark);margin-bottom:16px">🧴 Step 2 — اختار نوع المستحضر:</div>'
+    + '<div class="js-label-lg">🧴 Step 2 — اختار نوع المستحضر:</div>'
     + '<div id="w-type-opts" class="rec-options" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))"></div>'
     + '</div>'
     + '<div id="w-results"></div></div>';
@@ -5002,18 +4975,18 @@ function showWhiteningResults() {
     + '\n\n🛒 للطلب: alabdellatif-tarshouby.com/ar';
   var cardsHTML = picks.map(function(p, i) {
     return '<div class="rec-card" style="border-top:4px solid ' + colors[i] + '">'
-      + '<div class="rec-card-body" style="padding-top:14px">'
+      + '<div class="rec-card-body" class="js-pt-14">'
       + '<div class="rec-card-name">' + p.name + '</div>'
-      + (p.desc ? '<div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;margin:6px 0 8px">' + p.desc + '</div>' : '')
+      + (p.desc ? '<div class="js-desc">' + p.desc + '</div>' : '')
       + '<div class="rec-card-price" style="color:' + colors[i] + ';font-size:1rem">' + p.price + '</div>'
-      + '<div style="font-size:0.72rem;color:var(--text-muted);margin:4px 0 8px">كود: <strong style="color:var(--dark)">' + p.code + '</strong></div>'
+      + '<div class="js-desc-xs">كود: <strong style="color:var(--dark)">' + p.code + '</strong></div>'
       + '<button class="rec-card-shop" style="background:' + colors[i] + ';border:none;cursor:pointer;width:100%;font-family:Cairo,sans-serif;font-size:0.88rem;font-weight:700;color:white;padding:10px;border-radius:8px" onclick="wCopyCode(this,\'' + p.code + '\')">📋 نسخ الكود</button>'
       + '</div></div>';
   }).join('');
   var allList = pool.map(function(p) {
-    return '<div style="background:var(--bg);border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--border)">'
+    return '<div class="js-row-item">'
       + '<span style="font-size:0.76rem;font-weight:600;color:var(--dark)">' + p.name + '</span>'
-      + '<span style="font-size:0.8rem;font-weight:800;color:var(--rose-dark);white-space:nowrap">' + p.price + '</span>'
+      + '<span class="js-price">' + p.price + '</span>'
       + '</div>';
   }).join('');
   document.getElementById('w-results').innerHTML =
@@ -5021,18 +4994,18 @@ function showWhiteningResults() {
     + '<div class="rec-result-header"><div>'
     + '<h3>✅ ' + locLabel + ' — ' + typeLabel + '</h3>'
     + '<p>' + total + ' منتج متاح — جولة ' + roundLabel + ' من ' + maxRounds + '</p></div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
-    + '<button class="rec-reset-btn" onclick="showWhiteningResults()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.5)">🔀 ترشيح آخر</button>'
+    + '<div class="js-flex-wrap">'
+    + '<button class="rec-reset-btn" onclick="showWhiteningResults()" class="js-selected">🔀 ترشيح آخر</button>'
     + '<button class="rec-reset-btn" onclick="initWhiteningRec()">🔄 بحث جديد</button>'
     + '</div></div>'
-    + '<div style="background:#fdf3dd;border-right:3px solid var(--gold);border-radius:10px;padding:8px 14px;margin-bottom:16px;font-size:0.78rem;color:#8a6000">'
+    + '<div class="js-note-gold">'
     + '🔀 <strong>جولة ' + roundLabel + ' من ' + maxRounds + ':</strong> اضغط "ترشيح آخر" عشان تشوف منتجات مختلفة</div>'
     + '<div class="rec-cards-grid">' + cardsHTML + '</div>'
-    + '<div style="margin-bottom:12px;font-size:0.9rem;font-weight:800;color:var(--dark)">📋 رسالة جاهزة للإرسال للعميل:</div>'
+    + '<div class="js-label-lg">📋 رسالة جاهزة للإرسال للعميل:</div>'
     + '<div class="rec-copy-box"><button class="rec-copy-btn" onclick="wCopyMsg(this)">📋 نسخ الرسالة</button>'
     + '<pre id="wCopyText">' + copyText + '</pre></div>' + renderPrecautions('whitening')
-    + '<div style="margin-top:16px;background:white;border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow)">'
-    + '<div style="font-size:0.88rem;font-weight:800;color:var(--dark);margin-bottom:10px">🔍 كل المنتجات المتاحة (' + total + ' منتج):</div>'
+    + '<div class="js-card-sm js-mt-16">'
+    + '<div class="js-label">🔍 كل المنتجات المتاحة (' + total + ' منتج):</div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;max-height:300px;overflow-y:auto">' + allList + '</div>'
     + '</div></div>';
 }
@@ -5797,7 +5770,11 @@ function copyPrecautions(type, btn) {
 
 // ===== HAIR DYES DATA =====
 /* Data moved to dyes_products.json */
-  fetch("assets/data/dyes_products.json").then(r=>r.json()).then(d=>{ window.dyesProducts = d; });
+  fetch("assets/data/dyes_products.json").then(r=>r.json()).then(d=>{
+    window.dyesProducts = d;
+    var sec = document.getElementById('prod_dyes');
+    if (sec) { delete sec.dataset.loaded; initDyesSection(); }
+  });
 
 // ===== DYES SECTION RENDER =====
 function initDyesSection() {
@@ -5833,8 +5810,8 @@ function initDyesSection() {
   }
 
   var html = '<div class="section-header"><h2>🎨 الصبغات</h2><p>جميع صبغات الشعر مقسّمة حسب الشركة والنوع</p><div class="section-divider"></div></div>'
-    + '<div style="background:white;border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow);margin-bottom:20px;border-right:4px solid var(--gold)">'
-    + '<div style="font-size:0.88rem;font-weight:800;color:var(--dark);margin-bottom:12px">🔍 بحث بالاسم أو اللون أو الكود</div>'    + '<input id="dyesSearch" type="text" placeholder="ابحث... مثال: أشقر / بني / رمادي / 28792" oninput="filterDyes()" style="width:100%;padding:11px 16px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:Cairo,sans-serif;font-size:0.92rem;outline:none;box-sizing:border-box">'    + '<div style="margin-top:14px">'    + '<div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-bottom:6px">النوع</div>'    + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px" id="dyesTypeFilters">'    + '<button onclick="filterDyesType(this,\'all\')" class="dyes-filter-btn active" data-type="all">الكل</button>'    + '<button onclick="filterDyesType(this,\'permanent\')" class="dyes-filter-btn" data-type="permanent">دائمة</button>'    + '<button onclick="filterDyesType(this,\'semi\')" class="dyes-filter-btn" data-type="semi">نصف دائمة</button>'    + '<button onclick="filterDyesType(this,\'temp\')" class="dyes-filter-btn" data-type="temp">مؤقتة</button>'    + '<button onclick="filterDyesType(this,\'henna\')" class="dyes-filter-btn" data-type="henna">حنة وطبيعي</button>'    + '<button onclick="filterDyesType(this,\'dev\')" class="dyes-filter-btn" data-type="dev">أكسجين وتشقير</button>'    + '</div>'    + '<div id="dyesAmmoniaRow" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">'    + '<div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);width:100%;margin-bottom:4px">الأمونيا</div>'    + '<button onclick="filterDyesAmmonia(this,\'all\')" class="dyes-filter-btn active" data-ammonia="all">الكل</button>'    + '<button onclick="filterDyesAmmonia(this,\'no\')" class="dyes-filter-btn" data-ammonia="no">بدون أمونيا</button>'    + '<button onclick="filterDyesAmmonia(this,\'yes\')" class="dyes-filter-btn" data-ammonia="yes">بأمونيا</button>'    + '</div>'    + '</div>'
+    + '<div class="js-card-sm-gold">'
+    + '<div style="font-size:0.88rem;font-weight:800;color:var(--dark);margin-bottom:12px">🔍 بحث بالاسم أو اللون أو الكود</div>'    + '<input id="dyesSearch" type="text" placeholder="ابحث... مثال: أشقر / بني / رمادي / 28792" oninput="filterDyes()" style="width:100%;padding:11px 16px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:Cairo,sans-serif;font-size:0.92rem;outline:none;box-sizing:border-box">'    + '<div class="js-mt-14">'    + '<div class="js-label-xs">النوع</div>'    + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px" id="dyesTypeFilters">'    + '<button onclick="filterDyesType(this,\'all\')" class="dyes-filter-btn active" data-type="all">الكل</button>'    + '<button onclick="filterDyesType(this,\'permanent\')" class="dyes-filter-btn" data-type="permanent">دائمة</button>'    + '<button onclick="filterDyesType(this,\'semi\')" class="dyes-filter-btn" data-type="semi">نصف دائمة</button>'    + '<button onclick="filterDyesType(this,\'temp\')" class="dyes-filter-btn" data-type="temp">مؤقتة</button>'    + '<button onclick="filterDyesType(this,\'henna\')" class="dyes-filter-btn" data-type="henna">حنة وطبيعي</button>'    + '<button onclick="filterDyesType(this,\'dev\')" class="dyes-filter-btn" data-type="dev">أكسجين وتشقير</button>'    + '</div>'    + '<div id="dyesAmmoniaRow" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">'    + '<div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);width:100%;margin-bottom:4px">الأمونيا</div>'    + '<button onclick="filterDyesAmmonia(this,\'all\')" class="dyes-filter-btn active" data-ammonia="all">الكل</button>'    + '<button onclick="filterDyesAmmonia(this,\'no\')" class="dyes-filter-btn" data-ammonia="no">بدون أمونيا</button>'    + '<button onclick="filterDyesAmmonia(this,\'yes\')" class="dyes-filter-btn" data-ammonia="yes">بأمونيا</button>'    + '</div>'    + '</div>'
     + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px" id="dyesBrandFilters">'
     + '<button onclick="filterDyesBrand(this,\'الكل\')" style="padding:7px 14px;border-radius:20px;border:2px solid var(--rose);background:var(--rose);font-family:Cairo,sans-serif;font-size:0.8rem;font-weight:700;cursor:pointer;color:white;transition:all 0.2s" data-brand="الكل">الكل</button>'
     + '<button onclick="filterDyesBrand(this,\'فايتو\')" style="padding:7px 14px;border-radius:20px;border:2px solid #9c5fd433;background:white;font-family:Cairo,sans-serif;font-size:0.8rem;font-weight:700;cursor:pointer;color:#9c5fd4;transition:all 0.2s" data-brand="فايتو">فايتو</button>'
@@ -5850,7 +5827,7 @@ function initDyesSection() {
     + '<button onclick="filterDyesBrand(this,\'أكسجين\')" style="padding:7px 14px;border-radius:20px;border:2px solid #7a7a7a33;background:white;font-family:Cairo,sans-serif;font-size:0.8rem;font-weight:700;cursor:pointer;color:#7a7a7a;transition:all 0.2s" data-brand="أكسجين">أكسجين وتشقير</button>'
     + '<button onclick="filterDyesBrand(this,\'ترميم\')" style="padding:7px 14px;border-radius:20px;border:2px solid #9c5fd433;background:white;font-family:Cairo,sans-serif;font-size:0.8rem;font-weight:700;cursor:pointer;color:#9c5fd4;transition:all 0.2s" data-brand="ترميم">ترميم اللون</button>'
     + '</div>'
-    + '<div id="dyesSearchResult" style="margin-top:14px"></div>'
+    + '<div id="dyesSearchResult" class="js-mt-14"></div>'
     + '</div>';
 
   Object.keys(brands).forEach(function(brand) {
@@ -5889,7 +5866,7 @@ function filterDyes() {
 
   if (!found.length) { res.innerHTML = '<div style="color:var(--text-muted);font-size:0.88rem;padding:12px">لا توجد نتائج للبحث عن "'+q+'"</div>'; return; }
 
-  res.innerHTML = '<div style="font-size:0.82rem;font-weight:700;color:var(--text-muted);margin-bottom:10px">'+found.length+' نتيجة</div>'
+  res.innerHTML = '<div class="js-label-sm">'+found.length+' نتيجة</div>'
     +'<div class="store-cards-grid">'
     + found.map(function(p){
         return '<div class="store-card" style="border-top:3px solid var(--rose)">'
@@ -6080,7 +6057,7 @@ function applyDyesFilters() {
     return;
   }
 
-  res.innerHTML = '<div style="font-size:0.82rem;font-weight:700;color:var(--text-muted);margin-bottom:10px">'+found.length+' منتج</div>'
+  res.innerHTML = '<div class="js-label-sm">'+found.length+' منتج</div>'
     +'<div class="store-cards-grid">'
     + found.map(function(p){
         return '<div class="store-card" style="border-top:3px solid var(--rose)">'
@@ -6147,7 +6124,7 @@ function filterDyesBrand(btn, brand) {
 
   if (!found.length) { res.innerHTML = '<div style="color:var(--text-muted);font-size:0.88rem;padding:12px">لا توجد منتجات</div>'; return; }
 
-  res.innerHTML = '<div style="font-size:0.82rem;font-weight:700;color:var(--text-muted);margin-bottom:10px">'+found.length+' منتج — '+brand+'</div>'
+  res.innerHTML = '<div class="js-label-sm">'+found.length+' منتج — '+brand+'</div>'
     +'<div class="store-cards-grid">'
     + found.map(function(p){
         return '<div class="store-card" style="border-top:3px solid var(--rose)">'
@@ -6170,8 +6147,8 @@ function initDyesRec() {
     <div class="section-header"><h2>🎯 مرشح الصبغات الذكي</h2><p>اجاوب على الأسئلة وهيجيلك الترشيح المناسب</p><div class="section-divider"></div></div>
     <div style="max-width:680px" id="dyes-rec-wizard">
       <div id="dyes-q0" class="dyes-step">
-        <div style="background:white;border-radius:var(--radius);padding:24px 28px;box-shadow:var(--shadow);border-right:4px solid var(--rose)">
-          <div style="font-size:0.95rem;font-weight:800;color:var(--dark);margin-bottom:16px">1️⃣ عايزة الصبغة تكون إيه؟</div>
+        <div class="js-card-rose">
+          <div class="js-title-sm">1️⃣ عايزة الصبغة تكون إيه؟</div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
             <button class="dyes-opt" onclick="dyesAnswer('dyeType','permanent',this,'dyes-q1')">💪 دائمة</button>
             <button class="dyes-opt" onclick="dyesAnswer('dyeType','semi',this,'dyes-result')">🌀 شبه دائمة</button>
@@ -6180,44 +6157,44 @@ function initDyesRec() {
         </div>
       </div>
       <div id="dyes-q1" class="dyes-step" style="display:none">
-        <div style="background:white;border-radius:var(--radius);padding:24px 28px;box-shadow:var(--shadow);border-right:4px solid var(--rose)">
-          <div style="font-size:0.95rem;font-weight:800;color:var(--dark);margin-bottom:16px">2️⃣ هل العميلة حامل أو بترضع؟</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="js-card-rose">
+          <div class="js-title-sm">2️⃣ هل العميلة حامل أو بترضع؟</div>
+          <div class="js-grid-2">
             <button class="dyes-opt" onclick="dyesAnswer('pregnant','yes',this,'dyes-q2')">✅ نعم</button>
             <button class="dyes-opt" onclick="dyesAnswer('pregnant','no',this,'dyes-q2')">❌ لا</button>
           </div>
         </div>
       </div>
       <div id="dyes-q2" class="dyes-step" style="display:none">
-        <div style="background:white;border-radius:var(--radius);padding:24px 28px;box-shadow:var(--shadow);border-right:4px solid var(--rose)">
-          <div style="font-size:0.95rem;font-weight:800;color:var(--dark);margin-bottom:16px">3️⃣ عندها حساسية من صبغات الشعر؟</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="js-card-rose">
+          <div class="js-title-sm">3️⃣ عندها حساسية من صبغات الشعر؟</div>
+          <div class="js-grid-2">
             <button class="dyes-opt" onclick="dyesAnswer('sensitive','yes',this,'dyes-q3')">✅ نعم</button>
             <button class="dyes-opt" onclick="dyesAnswer('sensitive','no',this,'dyes-q3')">❌ لا</button>
           </div>
         </div>
       </div>
       <div id="dyes-q3" class="dyes-step" style="display:none">
-        <div style="background:white;border-radius:var(--radius);padding:24px 28px;box-shadow:var(--shadow);border-right:4px solid var(--rose)">
-          <div style="font-size:0.95rem;font-weight:800;color:var(--dark);margin-bottom:16px">4️⃣ عايزة بدون أمونيا؟</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="js-card-rose">
+          <div class="js-title-sm">4️⃣ عايزة بدون أمونيا؟</div>
+          <div class="js-grid-2">
             <button class="dyes-opt" onclick="dyesAnswer('noAmmonia','yes',this,'dyes-q4')">✅ نعم</button>
             <button class="dyes-opt" onclick="dyesAnswer('noAmmonia','no',this,'dyes-q4')">❌ مش مهم</button>
           </div>
         </div>
       </div>
       <div id="dyes-q4" class="dyes-step" style="display:none">
-        <div style="background:white;border-radius:var(--radius);padding:24px 28px;box-shadow:var(--shadow);border-right:4px solid var(--rose)">
-          <div style="font-size:0.95rem;font-weight:800;color:var(--dark);margin-bottom:16px">5️⃣ في حنة على الشعر؟</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="js-card-rose">
+          <div class="js-title-sm">5️⃣ في حنة على الشعر؟</div>
+          <div class="js-grid-2">
             <button class="dyes-opt" onclick="dyesAnswer('henna','yes',this,'dyes-q5')">✅ نعم</button>
             <button class="dyes-opt" onclick="dyesAnswer('henna','no',this,'dyes-q5')">❌ لا</button>
           </div>
         </div>
       </div>
       <div id="dyes-q5" class="dyes-step" style="display:none">
-        <div style="background:white;border-radius:var(--radius);padding:24px 28px;box-shadow:var(--shadow);border-right:4px solid var(--rose)">
-          <div style="font-size:0.95rem;font-weight:800;color:var(--dark);margin-bottom:16px">6️⃣ نسبة الشعر الأبيض تقريباً كام؟</div>
+        <div class="js-card-rose">
+          <div class="js-title-sm">6️⃣ نسبة الشعر الأبيض تقريباً كام؟</div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
             <button class="dyes-opt" onclick="dyesAnswer('white','none',this,'dyes-result')">🟢 مفيش</button>
             <button class="dyes-opt" onclick="dyesAnswer('white','some',this,'dyes-result')">🟡 شوية (أقل من 50%)</button>
@@ -6391,14 +6368,14 @@ function showDyesRecResult() {
   res.innerHTML = '<div style="font-size:1rem;font-weight:800;color:var(--dark);margin-bottom:14px">✅ الترشيح: '+title+'</div>'
     +'<div style="background:#fdf6ee;border-right:4px solid var(--gold);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:16px;font-size:0.85rem;font-weight:700;color:#7a5a00">🧪 '+oxygenTip+'</div>'
     +'<div class="store-cards-grid">'+cardsHTML+'</div>'
-    +(notes.length ? '<div style="background:white;border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow);margin-top:16px"><div style="font-size:0.88rem;font-weight:800;color:var(--dark);margin-bottom:10px">💡 نصايح مهمة</div>'
+    +(notes.length ? '<div style="background:white;border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow);margin-top:16px"><div class="js-label">💡 نصايح مهمة</div>'
       +notes.map(function(n){ return '<div style="font-size:0.84rem;padding:4px 0;border-bottom:1px solid var(--border);color:var(--text)">'+n+'</div>'; }).join('')+'</div>' : '')
-    +'<div class="rec-copy-box" style="margin-top:16px">'
+    +'<div class="rec-copy-box" class="js-mt-16">'
     +'<button onclick="copyDyesRec(this)" class="rec-copy-btn">📋 نسخ الترشيح للعميل</button>'
     +'<pre id="dyesRecCopyText" style="font-size:0.78rem">'+copyText+'</pre>'
     +'</div>'
     + renderPrecautions('dyes')
-    +'<div style="margin-top:16px"><button onclick="initDyesRec()" style="background:white;border:2px solid var(--rose);color:var(--rose);padding:10px 24px;border-radius:30px;font-family:Cairo,sans-serif;font-size:0.88rem;font-weight:700;cursor:pointer">🔄 بحث جديد</button></div>';
+    +'<div class="js-mt-16"><button onclick="initDyesRec()" style="background:white;border:2px solid var(--rose);color:var(--rose);padding:10px 24px;border-radius:30px;font-family:Cairo,sans-serif;font-size:0.88rem;font-weight:700;cursor:pointer">🔄 بحث جديد</button></div>';
 }
 
 function copyDyesRec(btn) {
@@ -6424,7 +6401,7 @@ function buildSectionSearch(containerId, data, filterConfig) {
   var filtersHTML = '';
   if (filterConfig) {
     filterConfig.forEach(function(fc) {
-      filtersHTML += '<div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-bottom:6px">' + fc.label + '</div>'
+      filtersHTML += '<div class="js-label-xs">' + fc.label + '</div>'
         + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px" id="sf-' + fc.key + '-' + containerId + '">'
         + fc.options.map(function(o, i) {
             return '<button onclick="applySectionFilter(\''+containerId+'\')" class="dyes-filter-btn'+(i===0?' active':'')+'" data-sf-'+fc.key+'="'+o.value+'">'+o.label+'</button>';
@@ -6433,8 +6410,8 @@ function buildSectionSearch(containerId, data, filterConfig) {
     });
   }
 
-  el.innerHTML = '<div style="background:white;border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow);margin-bottom:20px;border-right:4px solid var(--gold)">'
-    + '<div style="font-size:0.88rem;font-weight:800;color:var(--dark);margin-bottom:10px">🔍 بحث</div>'
+  el.innerHTML = '<div class="js-card-sm-gold">'
+    + '<div class="js-label">🔍 بحث</div>'
     + '<input id="sf-search-'+containerId+'" type="text" placeholder="ابحث باسم المنتج أو الكود..." oninput="applySectionFilter(\''+containerId+'\')" style="width:100%;padding:11px 16px;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:Cairo,sans-serif;font-size:0.92rem;outline:none;box-sizing:border-box;margin-bottom:12px">'
     + filtersHTML
     + '</div>'
@@ -6513,6 +6490,6 @@ function searchCleansers() {
     return (p.name+' '+(p.desc||'')+' '+(p.code||'')).toLowerCase().indexOf(q) !== -1;
   });
   if (!found.length) { res.innerHTML = '<div style="color:var(--text-muted);padding:12px;font-size:0.88rem">لا توجد نتائج</div>'; return; }
-  res.innerHTML = '<div style="font-size:0.82rem;font-weight:700;color:var(--text-muted);margin-bottom:10px">'+found.length+' نتيجة</div>'
+  res.innerHTML = '<div class="js-label-sm">'+found.length+' نتيجة</div>'
     + '<div class="store-cards-grid">' + found.map(function(p){ return makePriceCard(p); }).join('') + '</div>';
 }
