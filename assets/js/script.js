@@ -49,7 +49,13 @@ window.addEventListener('DOMContentLoaded', function() {
 });
 // Product data extracted from PDF
 /* Data moved to products.json */
-  fetch("assets/data/products.json").then(r=>r.json()).then(d=>{ window.products = d; });
+  fetch("assets/data/products.json").then(r=>r.json()).then(d=>{
+    window.products = d;
+    renderCleansers(); renderToners(); renderMoisturizers();
+    renderSunscreens(); renderAcne();
+    renderEye(); renderAntiAging(); renderHair(); renderSpecial();
+    renderWhiteningStore(); renderWhiteningSensitive();
+  });
 // ===== NAVIGATION =====
 const sectionTitles = {
 
@@ -1145,13 +1151,7 @@ function renderSpecial() {
   });
 }
 
-// Render all on load
-window.addEventListener('DOMContentLoaded', () => {
-  renderCleansers(); renderToners(); renderMoisturizers();
-  renderSunscreens(); renderAcne();
-  renderEye(); renderAntiAging(); renderHair(); renderSpecial();
-  renderWhiteningStore(); renderWhiteningSensitive();
-});
+// Render all on load — moved inside fetch callback above to avoid race condition
 setTimeout(() => {
   document.querySelectorAll('.bar-fill').forEach(b => {
     const w = b.style.width;
@@ -6512,5 +6512,3 @@ function searchCleansers() {
   res.innerHTML = '<div style="font-size:0.82rem;font-weight:700;color:var(--text-muted);margin-bottom:10px">'+found.length+' نتيجة</div>'
     + '<div class="store-cards-grid">' + found.map(function(p){ return makePriceCard(p); }).join('') + '</div>';
 }
-
-
