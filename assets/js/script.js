@@ -4575,7 +4575,11 @@ function acneCopyMsg(btn) {
 
 
 /* Data moved to anti_aging_products.json */
-  fetch("assets/data/anti_aging_products.json").then(r=>r.json()).then(d=>{ window.antiAgingProducts = d; });
+  fetch("assets/data/anti_aging_products.json").then(r=>r.json()).then(d=>{
+    window.antiAgingProducts = d;
+    var el = document.getElementById('sec-antiaging-all');
+    if (el) { delete el.dataset.loaded; renderAntiAging(); }
+  });
 
 // ===== RENDER ANTI-AGING SECTION =====
 function renderAntiAging() {
