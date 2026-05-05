@@ -85,7 +85,7 @@ window.addEventListener('DOMContentLoaded', function() {
   fetch("assets/data/products.json").then(r=>r.json()).then(d=>{
     window.products = d;
     renderCleansers(); renderToners(); renderMoisturizers();
-    renderSunscreens(); renderAcne();
+    renderSunscreens();
     renderEye(); renderAntiAging(); renderHair(); renderSpecial();
     renderWhiteningStore(); renderWhiteningSensitive();
   });
@@ -1089,7 +1089,7 @@ function renderSunscreens() {
 }
 
 function renderAcne() {
-  var items = (window.products && window.products.acne) || [];
+  var items = window.acneProducts || [];
   buildSectionSearch('sec-acne-all', items, [
     { key:'type', field:'types', label:'نوع المستحضر', options:[
       {value:'all',label:'الكل'},
